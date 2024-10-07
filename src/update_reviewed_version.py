@@ -78,6 +78,9 @@ def select_language(folder_path):
     lang = get_language_choice(numbered_langs, "\nEnter the number for the target language: ")
     return lang
 
+def mp4_exists(item_path):
+    return any(item.lower().endswith('.mp4') for item in os.listdir(item_path))
+
 if __name__ == "__main__":
 
     print("This script will let you generate a reviewed version!")
@@ -97,40 +100,38 @@ if __name__ == "__main__":
         if os.path.isdir(item_path):
             print_separator("=")
             print(f"Processing chapter {item}...")
-            MODIFIED = False
-            PPTX_NAME = f"{item}.pptx"
-            pptx_path = os.path.join(item_path, PPTX_NAME)
+            
+            if not mp4_exists(item_path):
+                PPTX_NAME = f"{item}.pptx"
+                pptx_path = os.path.join(item_path, PPTX_NAME)
 
-            print()
-            print("Processing pptx...")
-            if file_has_changed(pptx_path):
-                MODIFIED = True
+                print()
+                print("Processing pptx...")
                 print_separator(" ")
-                print("Exporting modified pptx...")
+                print("Exporting pptx...")
                 convert_pptx_to_png(pptx_path)
 
-            print_separator(" ")
-            print("Processing transcripts...")
-            slide_path = os.path.join(item_path, "slides/")
-            slide_items = os.listdir(slide_path)
+                print_separator(" ")
+                print("Processing transcripts...")
+                slide_path = os.path.join(item_path, "slides/")
+                slide_items = os.listdir(slide_path)
 
-            for slide_item in sorted(slide_items):
-                slide_item_path = os.path.join(slide_path, slide_item)
-                
-                if slide_item.lower().endswith('.txt'):
-                    if file_has_changed(slide_item_path):
-                        MODIFIED = True
+                for slide_item in sorted(slide_items):
+                    slide_item_path = os.path.join(slide_path, slide_item)
+                    
+                    if slide_item.lower().endswith('.txt'):
                         print(f"Generating audio for {slide_item}...")
                         voice = slide_item.split('.')[-2].split('_')[-1]
                         text_to_speech(slide_item_path, voice_ids[voice])
-            if MODIFIED:
+                        
                 video_path = os.path.join(item_path, f"{item}.mp4")
                 print_separator(" ")
                 print("Exporting chapter video...")
                 create_video(slide_path, video_path)
+            else:
+                print(f"Skipping chapter {item} as MP4 file already exists.")
 
         print_separator("=")
     print_separator(" ")
     course = os.path.basename(selected_dir)
     print(f"The {version} of {course} in {lang} has been fully generated!")
-
