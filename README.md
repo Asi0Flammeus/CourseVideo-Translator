@@ -39,6 +39,7 @@ This tool converts PowerPoint presentations to high-quality PNG images, with one
 
 3. **ImageMagick** - For PDF to PNG conversion
    - Ubuntu/Debian: `sudo apt-get install imagemagick`
+        - if it's not magick version 7 that is installed, I suggest you to compile it from source (see section below)
    - macOS: `brew install imagemagick`
    - Windows: Download from [ImageMagick website](https://imagemagick.org/script/download.php)
 
@@ -111,3 +112,56 @@ python pptx_converter.py presentation.pptx --keep-pdf
 - The script requires proper permissions to create directories and files
 - Processing time depends on the number and complexity of slides
 - Memory usage scales with slide resolution and complexity
+
+## Install ImageMagick-7 from source
+
+Remove current imageMagick installation 
+
+
+```sh
+sudo apt remove imagemagick
+sudo apt autoremove
+```
+
+Install the lastest version 
+
+```sh
+# Install build dependencies
+sudo apt update
+sudo apt install build-essential checkinstall libx11-dev libxext-dev zlib1g-dev libpng-dev libjpeg-dev libfreetype6-dev libxml2-dev
+
+# Download and install ImageMagick 7
+cd /tmp
+wget https://imagemagick.org/archive/ImageMagick.tar.gz
+tar xvzf ImageMagick.tar.gz
+cd ImageMagick-*
+
+# Configure and install
+./configure
+make
+sudo checkinstall
+```
+
+Update ImageMagick policy to allow PDF operation (crucial step)
+
+```sh
+sudo mkdir /etc/ImageMagick-7
+sudo cp ./config/policy.xml
+sudo nano /etc/ImageMagick-7/policy.xml
+```
+
+Add this in your policy map
+
+```xml
+
+  <!-- Enable PDF reading -->
+  <policy domain="coder" rights="read|write" pattern="PDF" />
+  
+  <!-- Other common formats -->
+  <policy domain="coder" rights="read|write" pattern="JPEG" />
+  <policy domain="coder" rights="read|write" pattern="PNG" />
+  <policy domain="coder" rights="read|write" pattern="TIFF" />
+  <policy domain="coder" rights="read|write" pattern="GIF" />
+```
+Replace the line `<policy domain="coder" rights="none" pattern="PDF" />` by `<policy domain="coder" rights="read|write" pattern="PDF" />`
+

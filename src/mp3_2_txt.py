@@ -6,7 +6,7 @@ import openai
 import tiktoken
 from pydub import AudioSegment
 from dotenv import load_dotenv
-from openai.error import RateLimitError, Timeout, APIError
+from openai import RateLimitError, Timeout, APIError
 
 def num_tokens_from_string(string: str, encoding_name: str) -> int:
     """Returns the number of tokens in a text string."""
@@ -143,19 +143,25 @@ class TranscriptionModel:
         for attempt in range(max_retries):
             try:
                 with open(file_path, "rb") as audio_file:
-                    transcript = openai.Audio.transcribe("whisper-1", audio_file)
+                    # Updated to use the new client.audio.transcribe method
+                    client = openai.OpenAI()
+                    transcript = client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file
+                    )
                 
                 # Extract the transcript text
-                transcript_text = transcript["text"]
+                transcript_text = transcript.text
                 return transcript_text
 
-            except (RateLimitError, Timeout, APIError) as e:
+            except Exception as e:
                 print(f"Attempt {attempt + 1} failed: {str(e)}")
                 if attempt < max_retries - 1:
                     print(f"Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                 else:
                     raise Exception(f"Transcription failed after {max_retries} attempts. Last error: {str(e)}")
+
 
     def transcribe_multiple_chunks_audio(self, max_retries=10, retry_delay=5):
         """
@@ -211,3 +217,77 @@ class TranscriptionModel:
         self.load_audio(audio_file)
         transcript = self.transcribe_multiple_chunks_audio(max_retries, retry_delay)
         return transcript
+def main():
+    # Set the base path
+    base_path = "../../../vault/DBxPBN/workspace/assets/educational-content/courses/Free/"
+    
+    # Get and sort the folders in the base path
+    try:
+        folders = [f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))]
+        folders.sort()
+        
+        # Print available folders
+        print("\nAvailable folders:")
+        for i, folder in enumerate(folders, 1):
+            print(f"{i}. {folder}")
+            
+        # Get user input for folder selection
+        while True:
+            try:
+                selection = int(input("\nEnter the number of the folder to process (1-{}): ".format(len(folders))))
+                if 1 <= selection <= len(folders):
+                    break
+                print("Invalid selection. Please try again.")
+            except ValueError:
+                print("Please enter a valid number.")
+        
+        selected_folder = folders[selection-1]
+        folder_path = os.path.join(base_path, selected_folder, "translation/fr/v001")
+        
+        # Get all subfolders
+        subfolders = [f for f in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, f))]
+        subfolders.sort()
+        
+        # Process each subfolder
+        for subfolder in subfolders:
+            slides_path = os.path.join(folder_path, subfolder, "slides")
+            
+            # Check if slides folder exists
+            if not os.path.exists(slides_path):
+                print(f"\nSkipping {subfolder} - no slides folder found")
+                continue
+                
+            print(f"\nProcessing {subfolder}...")
+            
+            # Get all MP3 files in the slides folder
+            mp3_files = [f for f in os.listdir(slides_path) if f.lower().endswith('.mp3')]
+            mp3_files.sort()
+            
+            if not mp3_files:
+                print(f"No MP3 files found in {subfolder}/slides")
+                continue
+            
+            # Process each MP3 file
+            transcriber = TranscriptionModel(slides_path)
+            for mp3_file in mp3_files:
+                transcript_file = os.path.join(slides_path, f"{os.path.splitext(mp3_file)[0]}.txt")
+                
+                # Check if transcript already exists
+                if os.path.exists(transcript_file):
+                    print(f"Skipping {mp3_file} - transcript already exists")
+                    continue
+                
+                print(f"Transcribing: {mp3_file}")
+                try:
+                    mp3_path = os.path.join(slides_path, mp3_file)
+                    transcript = transcriber.load_and_transcribe_audio(mp3_path)
+                    print(f"Transcription completed for {mp3_file}")
+                except Exception as e:
+                    print(f"Error transcribing {mp3_file}: {str(e)}")
+                    continue
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+
+if __name__ == "__main__":
+    main()
+

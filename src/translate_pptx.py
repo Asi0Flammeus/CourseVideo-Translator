@@ -207,60 +207,110 @@ def prompt_language_selection(prompt_text: str) -> str:
             return lang
         print("Invalid language code. Please try again.")
 
+
 def main():
     """CLI entry point"""
-    parser = argparse.ArgumentParser(description="Translate PowerPoint presentations using DeepL API")
-    parser.add_argument("--source", help="Source language code")
-    parser.add_argument("--target", help="Target language code")
-    parser.add_argument("--input", help="Input PPTX file path")
-    parser.add_argument("--output", help="Output PPTX file path")
-    args = parser.parse_args()
-
+    # Set the base path
+    base_path = "../../../vault/DBxPBN/workspace/assets/educational-content/courses/Free/"
+    
     try:
-        # Interactive mode if no arguments provided
-        if not all([args.source, args.target, args.input, args.output]):
-            print("=== PPTX Translator ===")
-            
-            # Language selection
-            source_lang = prompt_language_selection("Select source language:")
-            target_lang = prompt_language_selection("Select target language:")
-            
-            # File selection
-            input_files = list_input_files()
-            if not input_files:
-                print("\nError: No PPTX files found in ../inputs/pptx/")
-                return
-            
-            print("\nAvailable files:")
-            for i, file in enumerate(input_files, 1):
-                print(f"{i}: {file.name}")
-            
-            while True:
-                try:
-                    choice = int(input("\nEnter file number: ")) - 1
-                    input_file = input_files[choice]
-                    break
-                except (ValueError, IndexError):
-                    print("Invalid selection. Please try again.")
-            
-            output_file = Path(f"../outputs/pptx/{input_file.stem}_{target_lang}{input_file.suffix}")
-        else:
-            source_lang = args.source
-            target_lang = args.target
-            input_file = Path(args.input)
-            output_file = Path(args.output)
-
-        # Initialize translator and process file
-        translator = PPTXTranslator()
-        translator.translate_pptx(
-            source_lang=source_lang,
-            target_lang=target_lang,
-            input_path=str(input_file),
-            output_path=str(output_file)
-        )
-        print(f"\nTranslation completed successfully!")
-        print(f"Output saved to: {output_file}")
+        # Get and sort the folders in the base path
+        folders = [f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))]
+        folders.sort()
         
+        # Print available folders
+        print("\n=== PPTX Translator ===")
+        print("\nAvailable folders:")
+        for i, folder in enumerate(folders, 1):
+            print(f"{i}. {folder}")
+            
+        # Get user input for folder selection
+        while True:
+            try:
+                selection = int(input("\nEnter the number of the folder to process (1-{}): ".format(len(folders))))
+                if 1 <= selection <= len(folders):
+                    break
+                print("Invalid selection. Please try again.")
+            except ValueError:
+                print("Please enter a valid number.")
+        
+        selected_folder = folders[selection-1]
+        
+        # Language selection
+        source_lang = prompt_language_selection("Select source language:")
+        target_lang = prompt_language_selection("Select target language:")
+        
+        # Define source and target folder paths
+        source_folder_path = os.path.join(base_path, selected_folder, f"translation/{source_lang}/v001")
+        target_folder_path = os.path.join(base_path, selected_folder, f"translation/{target_lang}/v001")
+        
+        # Check if source folder exists
+        if not os.path.exists(source_folder_path):
+            raise Exception(f"Source folder does not exist: {source_folder_path}")
+        
+        # Create target folder if it doesn't exist
+        os.makedirs(target_folder_path, exist_ok=True)
+        
+        # Show confirmation
+        print("\nPlease confirm the following paths:")
+        print(f"\nSource folder: {source_folder_path}")
+        print(f"Target folder: {target_folder_path}")
+        
+        confirm = input("\nProceed with translation? (y/n): ").lower()
+        if confirm != 'y':
+            print("Translation cancelled.")
+            return
+        
+        # Get all subfolders from source
+        subfolders = [f for f in os.listdir(source_folder_path) if os.path.isdir(os.path.join(source_folder_path, f))]
+        subfolders.sort()
+        
+        # Initialize translator
+        translator = PPTXTranslator()
+        
+        # Process each subfolder
+        for subfolder in subfolders:
+            source_subfolder_path = os.path.join(source_folder_path, subfolder)
+            target_subfolder_path = os.path.join(target_folder_path, subfolder)
+            
+            # Create target subfolder if it doesn't exist
+            os.makedirs(target_subfolder_path, exist_ok=True)
+            
+            # Get all PPTX files in the source subfolder
+            pptx_files = [f for f in os.listdir(source_subfolder_path) if f.lower().endswith('.pptx')]
+            
+            if not pptx_files:
+                print(f"\nNo PPTX files found in {subfolder}")
+                continue
+                
+            print(f"\nProcessing {subfolder}...")
+            
+            # Process each PPTX file
+            for pptx_file in pptx_files:
+                print(f"\nTranslating: {pptx_file}")
+                
+                # Construct input and output paths
+                input_path = os.path.join(source_subfolder_path, pptx_file)
+                output_path = os.path.join(target_subfolder_path, pptx_file)
+                
+                # Check if translated file already exists
+                if os.path.exists(output_path):
+                    print(f"Skipping {pptx_file} - translation already exists at: {output_path}")
+                    continue
+                
+                try:
+                    translator.translate_pptx(
+                        source_lang=source_lang,
+                        target_lang=target_lang,
+                        input_path=input_path,
+                        output_path=output_path
+                    )
+                    print(f"Translation completed for {pptx_file}")
+                    print(f"Saved to: {output_path}")
+                except Exception as e:
+                    print(f"Error translating {pptx_file}: {str(e)}")
+                    continue
+                    
     except TranslationError as e:
         print(f"\nTranslation error: {str(e)}")
         sys.exit(1)
@@ -270,3 +320,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
